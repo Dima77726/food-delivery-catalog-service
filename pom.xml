@@ -4,14 +4,31 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.dima</groupId>
-        <artifactId>food-delivery-platform</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.5</version>
+        <relativePath/>
     </parent>
 
+    <groupId>com.dima</groupId>
+    <version>0.0.1-SNAPSHOT</version>
     <artifactId>catalog-service</artifactId>
     <name>catalog-service</name>
     <description>Каталог: рестораны, меню и поиск по витрине</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <!-- Ветка 3.x springdoc — единственная, совместимая со Spring Boot 4 / Framework 7. -->
+        <springdoc.version>3.1.0</springdoc.version>
+        <!-- Версия контрактов своя, отдельно от версии сервиса: см. food-delivery-contracts. -->
+        <contracts.version>1.0.0</contracts.version>
+        <spring-grpc.version>1.0.3</spring-grpc.version>
+        <protobuf-java.version>4.33.4</protobuf-java.version>
+        <resilience4j.version>2.3.0</resilience4j.version>
+        <openapi-generator.version>7.24.0</openapi-generator.version>
+        <!-- Спецификация распаковывается из jar клиента контрактов: см. unpack-openapi-spec. -->
+        <openapi.spec>${project.build.directory}/contract/openapi/food-delivery-api.yaml</openapi.spec>
+    </properties>
 
     <!--
         Второй вынесенный сервис. В отличие от уведомлений, с монолитом его связывают
@@ -25,6 +42,54 @@
         или мобильному клиенту gRPC неудобен. Внешний протокол и внутренний выбираются
         под своего потребителя независимо.
     -->
+
+    <!--
+        Контракты платформы — в GitHub Packages репозитория food-delivery-contracts. Читать оттуда
+        нужен токен даже для публичных пакетов: см. README контрактов (settings.xml с сервером github).
+    -->
+    <repositories>
+        <repository>
+            <id>github</id>
+            <url>https://maven.pkg.github.com/Dima77726/food-delivery-contracts</url>
+        </repository>
+    </repositories>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.dima</groupId>
+                <artifactId>grpc-contracts</artifactId>
+                <version>${contracts.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.dima</groupId>
+                <artifactId>food-delivery-client</artifactId>
+                <version>${contracts.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java</artifactId>
+                <version>${protobuf-java.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.grpc</groupId>
+                <artifactId>spring-grpc-dependencies</artifactId>
+                <version>${spring-grpc.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-circuitbreaker</artifactId>
+                <version>${resilience4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-micrometer</artifactId>
+                <version>${resilience4j.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -174,7 +239,7 @@
         <dependency>
             <groupId>com.dima</groupId>
             <artifactId>food-delivery-client</artifactId>
-            <version>${project.version}</version>
+            <version>${contracts.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -216,9 +281,39 @@
                 так же, как раньше в монолите. Настройки перенесены оттуда без изменений,
                 пояснения к ним — в pom монолита в истории git.
             -->
+            <!--
+                Спецификация приезжает внутри jar клиента контрактов, а не лежит копией в этом
+                репозитории: копия разошлась бы с контрактом уже на второй правке. Распаковка стоит
+                раньше генератора в той же фазе — Maven выполняет их в порядке объявления.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>unpack-openapi-spec</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>unpack</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.dima</groupId>
+                                    <artifactId>food-delivery-client</artifactId>
+                                    <version>${contracts.version}</version>
+                                    <includes>openapi/food-delivery-api.yaml</includes>
+                                    <outputDirectory>${project.build.directory}/contract</outputDirectory>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.openapitools</groupId>
                 <artifactId>openapi-generator-maven-plugin</artifactId>
+                <version>${openapi-generator.version}</version>
                 <executions>
                     <execution>
                         <id>generate-server-api</id>
