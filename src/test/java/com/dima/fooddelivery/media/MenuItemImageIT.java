@@ -64,7 +64,8 @@ class MenuItemImageIT {
     private static final String SECRET_KEY = "minio-test-secret-123";
     private static final int S3_PORT = 9000;
 
-    static final GenericContainer<?> MINIO = new GenericContainer<>("minio/minio:RELEASE.2025-04-22T22-12-26Z")
+    // Официальные образы minio/minio и quay.io/minio/minio сняты с публикации; берём сборку Chainguard.
+    static final GenericContainer<?> MINIO = new GenericContainer<>("cgr.dev/chainguard/minio:latest")
             .withCommand("server", "/data")
             .withEnv("MINIO_ROOT_USER", ACCESS_KEY)
             .withEnv("MINIO_ROOT_PASSWORD", SECRET_KEY)
