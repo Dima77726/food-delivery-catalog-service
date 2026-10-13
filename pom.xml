@@ -24,6 +24,8 @@
         <contracts.version>1.2.0</contracts.version>
         <!-- Клиент MinIO (S3 API). Не входит в spring-boot-dependencies. -->
         <minio.version>8.5.17</minio.version>
+        <!-- Версия okhttp 5, которую уже тянет экспортёр OpenTelemetry; держать в согласии с ней. -->
+        <okhttp.version>5.2.1</okhttp.version>
         <spring-grpc.version>1.0.3</spring-grpc.version>
         <protobuf-java.version>4.33.4</protobuf-java.version>
         <resilience4j.version>2.3.0</resilience4j.version>
@@ -154,6 +156,20 @@
             <groupId>io.minio</groupId>
             <artifactId>minio</artifactId>
             <version>${minio.version}</version>
+            <exclusions>
+                <!-- minio тянет okhttp 4.12 с okio 3.6, а экспортёр OpenTelemetry — okhttp 5 (okhttp-jvm),
+                     которому нужен свежий okio. Два okhttp в одном classpath ломают друг друга
+                     (NoSuchMethodError в okio), поэтому остаётся один — пятый. -->
+                <exclusion>
+                    <groupId>com.squareup.okhttp3</groupId>
+                    <artifactId>okhttp</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp-jvm</artifactId>
+            <version>${okhttp.version}</version>
         </dependency>
 
         <!-- Предохранитель на исходящих gRPC-вызовах; см. CircuitBreakerClientInterceptor. -->
