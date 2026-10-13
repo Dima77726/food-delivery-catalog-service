@@ -49,7 +49,8 @@ public final class MenuResponseMapper {
                 .price(item.price())
                 .sortOrder(item.sortOrder())
                 .available(item.available())
-                .archived(item.archived());
+                .archived(item.archived())
+                .imageUrl(item.imageUrl());
     }
 
     public static ManagedMenuCategory toManagedResponse(com.dima.fooddelivery.menu.domain.MenuCategoryView category) {
@@ -82,7 +83,8 @@ public final class MenuResponseMapper {
                 .name(item.name())
                 .description(item.description())
                 .price(item.price())
-                .available(item.available());
+                .available(item.available())
+                .imageUrl(item.imageUrl());
     }
 
     private MenuResponseMapper() {

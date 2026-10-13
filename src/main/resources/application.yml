@@ -2,6 +2,13 @@ spring:
   application:
     name: catalog-service
 
+  servlet:
+    multipart:
+      # Загрузка фото обрывается контейнером, не дочитывая тело, если файл заведомо больше предела.
+      # Предел чуть выше app.media.max-size: точную проверку и понятный ответ даёт прикладной код.
+      max-file-size: 3MB
+      max-request-size: 4MB
+
   lifecycle:
     # Согласовано с stop_grace_period в docker-compose.yml.
     timeout-per-shutdown-phase: 20s
@@ -70,6 +77,17 @@ app:
   grpc:
     identity:
       deadline: ${IDENTITY_GRPC_DEADLINE:PT2S}
+
+  media:
+    # Фото блюд в MinIO (S3 API). Выключено по умолчанию: без хранилища загрузка отвечает 503,
+    # а остальное меню работает. Docker Compose включает. Бакет создаётся сам при первой записи.
+    enabled: ${MEDIA_ENABLED:false}
+    endpoint: ${MEDIA_ENDPOINT:http://localhost:9000}
+    # Значений по умолчанию нет: это секреты. Локально — корневые ключи MinIO из .env.
+    access-key: ${MEDIA_ACCESS_KEY:}
+    secret-key: ${MEDIA_SECRET_KEY:}
+    bucket: ${MEDIA_BUCKET:menu-images}
+    max-size: ${MEDIA_MAX_SIZE:2MB}
 
   security:
     jwt:

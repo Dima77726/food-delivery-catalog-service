@@ -25,7 +25,8 @@ public record MenuItemView(
         BigDecimal price,
         int sortOrder,
         boolean available,
-        boolean archived
+        boolean archived,
+        String imageUrl
 ) {
 
     public static MenuItemView of(MenuItem item) {
@@ -37,7 +38,8 @@ public record MenuItemView(
                 item.getPrice(),
                 item.getSortOrder(),
                 item.isAvailable(),
-                item.isArchived()
+                item.isArchived(),
+                MenuImages.publicPath(item.getImageKey())
         );
     }
 }

@@ -21,7 +21,9 @@
         <!-- Ветка 3.x springdoc — единственная, совместимая со Spring Boot 4 / Framework 7. -->
         <springdoc.version>3.1.0</springdoc.version>
         <!-- Версия контрактов своя, отдельно от версии сервиса: см. food-delivery-contracts. -->
-        <contracts.version>1.0.0</contracts.version>
+        <contracts.version>1.2.0</contracts.version>
+        <!-- Клиент MinIO (S3 API). Не входит в spring-boot-dependencies. -->
+        <minio.version>8.5.17</minio.version>
         <spring-grpc.version>1.0.3</spring-grpc.version>
         <protobuf-java.version>4.33.4</protobuf-java.version>
         <resilience4j.version>2.3.0</resilience4j.version>
@@ -145,6 +147,13 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-opentelemetry</artifactId>
+        </dependency>
+
+        <!-- Фото блюд лежат в MinIO; см. MinioImageStorage. -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>${minio.version}</version>
         </dependency>
 
         <!-- Предохранитель на исходящих gRPC-вызовах; см. CircuitBreakerClientInterceptor. -->
