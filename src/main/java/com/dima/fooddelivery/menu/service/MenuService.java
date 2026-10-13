@@ -4,6 +4,8 @@ import com.dima.fooddelivery.common.cache.CacheNames;
 import com.dima.fooddelivery.common.exception.BusinessRuleViolationException;
 import com.dima.fooddelivery.common.exception.ResourceNotFoundException;
 import com.dima.fooddelivery.common.persistence.DataAccessErrors;
+import com.dima.fooddelivery.media.ImageStorage;
+import com.dima.fooddelivery.media.ImageType;
 import com.dima.fooddelivery.menu.domain.MenuCategory;
 import com.dima.fooddelivery.menu.domain.MenuCategoryView;
 import com.dima.fooddelivery.menu.domain.MenuItem;
@@ -20,8 +22,11 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 /**
  * Модуль Menu: витрина для посетителя и управление для владельца ресторана.
@@ -54,6 +59,7 @@ public class MenuService {
     private final MenuCategoryRepository categoryRepository;
     private final MenuItemRepository itemRepository;
     private final RestaurantService restaurantService;
+    private final ImageStorage imageStorage;
 
     // --- Витрина ------------------------------------------------------------------------------
 
@@ -315,6 +321,111 @@ public class MenuService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Категория с id=" + categoryId + " не найдена в ресторане с id=" + restaurantId
                 ));
+    }
+
+    // --- Фото блюд ----------------------------------------------------------------------------
+
+    /**
+     * Сохраняет фото блюда, заменяя прежнее.
+     *
+     * <p><b>Хранилище и база — две системы, общей транзакции у них нет</b>, поэтому порядок выбран так,
+     * чтобы любой сбой оставлял в худшем случае лишний объект, а не блюдо с ссылкой в пустоту:
+     * <ol>
+     *   <li>фото кладётся в хранилище под <i>новым</i> ключом (со случайной частью — прежнее фото и
+     *       его адрес в чужих кэшах и закладках не затрагиваются);</li>
+     *   <li>ключ записывается в блюдо в транзакции базы;</li>
+     *   <li>откат — новый объект удаляется (компенсация); фиксация — удаляется прежний.</li>
+     * </ol>
+     * Если удалить не вышло (хранилище недоступно именно в этот момент), объект остаётся сиротой:
+     * место занято, но ни одно блюдо на него не ссылается. Такой сбой в журнале виден предупреждением.
+     *
+     * <p>Кэш публичного меню сбрасывается: в нём лежит адрес фото вместе с остальными полями блюда.
+     *
+     * @throws ImageStorage.UnsupportedImageException если содержимое не JPEG, PNG и не WebP
+     */
+    @CacheEvict(cacheNames = CacheNames.RESTAURANT_MENU, key = "#restaurantId")
+    @Transactional
+    public MenuItemView setItemImage(Long restaurantId, Long itemId, byte[] content) {
+        MenuItem item = requireItemInRestaurant(restaurantId, itemId);
+
+        if (item.isArchived()) {
+            throw new BusinessRuleViolationException(
+                    "Блюдо с id=" + itemId + " нельзя изменить: оно архивировано"
+            );
+        }
+
+        // Тип — по содержимому, а не по имени и заголовку: их задаёт клиент.
+        ImageType type = ImageType.detect(content).orElseThrow(() -> new ImageStorage.UnsupportedImageException(
+                "Файл не похож на изображение: поддерживаются JPEG, PNG и WebP"
+        ));
+
+        String previousKey = item.getImageKey();
+        String newKey = "menu-items/%d/%s.%s".formatted(itemId, UUID.randomUUID(), type.extension());
+
+        imageStorage.put(newKey, content, type.contentType());
+
+        // Синхронизация регистрируется после успешной загрузки: если загрузка упала, убирать нечего.
+        afterTransaction(committed -> {
+            if (committed) {
+                deleteQuietly(previousKey);
+            } else {
+                deleteQuietly(newKey);
+            }
+        });
+
+        item.setImageKey(newKey);
+        itemRepository.flush();
+
+        log.info("Загружено фото блюда: restaurantId={}, itemId={}, key={}", restaurantId, itemId, newKey);
+
+        return MenuItemView.of(item);
+    }
+
+    /** Убирает фото блюда. Повторный вызов — успех: у блюда и так нет фото. */
+    @CacheEvict(cacheNames = CacheNames.RESTAURANT_MENU, key = "#restaurantId")
+    @Transactional
+    public void removeItemImage(Long restaurantId, Long itemId) {
+        MenuItem item = requireItemInRestaurant(restaurantId, itemId);
+        String previousKey = item.getImageKey();
+
+        if (previousKey == null) {
+            return;
+        }
+
+        item.setImageKey(null);
+        itemRepository.flush();
+
+        // Объект удаляется только после фиксации: при откате блюдо снова ссылается на него.
+        afterTransaction(committed -> {
+            if (committed) {
+                deleteQuietly(previousKey);
+            }
+        });
+
+        log.info("Удалено фото блюда: restaurantId={}, itemId={}", restaurantId, itemId);
+    }
+
+    private void afterTransaction(java.util.function.Consumer<Boolean> action) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+
+            @Override
+            public void afterCompletion(int status) {
+                action.accept(status == STATUS_COMMITTED);
+            }
+        });
+    }
+
+    /** Сбой удаления не должен ломать уже выполненную операцию: объект остаётся сиротой, а это не авария. */
+    private void deleteQuietly(String key) {
+        if (key == null) {
+            return;
+        }
+
+        try {
+            imageStorage.delete(key);
+        } catch (RuntimeException exception) {
+            log.warn("Объект фото не удалён и остался сиротой: key={}, reason={}", key, exception.getMessage());
+        }
     }
 
     private MenuItem requireItemInRestaurant(Long restaurantId, Long itemId) {

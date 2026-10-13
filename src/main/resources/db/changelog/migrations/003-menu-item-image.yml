@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-menu-item-image
+      author: dima
+      changes:
+        - sqlFile:
+            path: sql/003-menu-item-image.sql
+            relativeToChangelogFile: true
+            splitStatements: true

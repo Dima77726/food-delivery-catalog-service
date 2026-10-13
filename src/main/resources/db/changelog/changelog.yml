@@ -5,3 +5,6 @@ databaseChangeLog:
   - include:
       file: migrations/002-seed-demo-catalog.yml
       relativeToChangelogFile: true
+  - include:
+      file: migrations/003-menu-item-image.yml
+      relativeToChangelogFile: true

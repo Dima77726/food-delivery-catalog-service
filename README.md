@@ -32,3 +32,13 @@ docker build --secret id=maven_settings,src=$HOME/.m2/settings.xml -t food-deliv
 ```
 
 CI публикует образ в `ghcr.io/<владелец>/food-delivery-catalog-service` на каждый пуш в `main` и `dev`.
+
+## Фото блюд (MinIO)
+
+`PUT /api/v1/restaurants/{id}/menu/items/{itemId}/image` (multipart, поле `file`) и `DELETE` на тот же адрес.
+JPEG, PNG, WebP до 2 МБ; тип определяется по содержимому, а не по имени. Объекты лежат в MinIO
+(`menu-items/{itemId}/{uuid}.{ext}`), в базе — только ключ; в меню отдаётся `imageUrl` вида `/media/...`,
+который шлюз проксирует на бакет (публичное чтение, запись только по ключам сервиса).
+
+Включение: `MEDIA_ENABLED=true`, `MEDIA_ENDPOINT`, `MEDIA_ACCESS_KEY`, `MEDIA_SECRET_KEY`, `MEDIA_BUCKET`,
+`MEDIA_MAX_SIZE`. По умолчанию выключено: загрузка отвечает 503, остальное меню работает.

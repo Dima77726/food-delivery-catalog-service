@@ -374,6 +374,41 @@ public class GlobalExceptionHandler {
      * Сосед, без которого запрос не решить, не ответил. 503 говорит клиенту ровно то, что
      * произошло: сервис жив, но сейчас выполнить запрос не может — стоит повторить позже.
      */
+    /** Тип файла не поддерживается: 415. Клиент должен прислать JPEG, PNG или WebP. */
+    @ExceptionHandler(com.dima.fooddelivery.media.ImageStorage.UnsupportedImageException.class)
+    ResponseEntity<ApiErrorResponse> handleUnsupportedImage(
+            com.dima.fooddelivery.media.ImageStorage.UnsupportedImageException exception,
+            HttpServletRequest request
+    ) {
+        return response(HttpStatus.UNSUPPORTED_MEDIA_TYPE, exception.getMessage(), request);
+    }
+
+    /** Файл слишком большой: 413. Ловит и наше исключение, и обрыв загрузки самим контейнером. */
+    @ExceptionHandler({
+            com.dima.fooddelivery.media.ImageStorage.ImageTooLargeException.class,
+            org.springframework.web.multipart.MaxUploadSizeExceededException.class
+    })
+    ResponseEntity<ApiErrorResponse> handleImageTooLarge(Exception exception, HttpServletRequest request) {
+        return response(
+                HttpStatus.CONTENT_TOO_LARGE,
+                exception instanceof com.dima.fooddelivery.media.ImageStorage.ImageTooLargeException
+                        ? exception.getMessage()
+                        : "Файл больше допустимого размера",
+                request
+        );
+    }
+
+    /** Хранилище фото недоступно или выключено: 503. Остальное меню при этом работает. */
+    @ExceptionHandler(com.dima.fooddelivery.media.ImageStorage.MediaUnavailableException.class)
+    ResponseEntity<ApiErrorResponse> handleMediaUnavailable(
+            com.dima.fooddelivery.media.ImageStorage.MediaUnavailableException exception,
+            HttpServletRequest request
+    ) {
+        log.warn("Хранилище фото недоступно: {}", exception.getMessage());
+
+        return response(HttpStatus.SERVICE_UNAVAILABLE, "Фото сейчас принять нельзя, повторите позже", request);
+    }
+
     @ExceptionHandler(UpstreamUnavailableException.class)
     ResponseEntity<ApiErrorResponse> handleUpstreamUnavailable(
             UpstreamUnavailableException exception,

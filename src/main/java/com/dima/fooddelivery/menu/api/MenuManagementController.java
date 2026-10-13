@@ -1,6 +1,8 @@
 package com.dima.fooddelivery.menu.api;
 
 import com.dima.fooddelivery.generated.api.MenuManagementApi;
+import com.dima.fooddelivery.media.ImageStorage;
+import com.dima.fooddelivery.media.MediaProperties;
 import com.dima.fooddelivery.generated.model.CreateMenuCategoryRequest;
 import com.dima.fooddelivery.generated.model.CreateMenuItemRequest;
 import com.dima.fooddelivery.generated.model.ManagedMenu;
@@ -29,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class MenuManagementController implements MenuManagementApi {
 
     private final MenuService menuService;
+    private final MediaProperties mediaProperties;
 
     @Override
     public ResponseEntity<ManagedMenu> getManagedMenu(Long restaurantId) {
@@ -112,6 +115,49 @@ public class MenuManagementController implements MenuManagementApi {
                 request.getPrice(),
                 request.getSortOrder()
         )));
+    }
+
+    /**
+     * Размер проверяется дважды: настройки multipart обрывают заведомо огромную загрузку, не дочитывая
+     * тело, а здесь отсекается файл чуть больше предела. Без второй проверки предел знал бы только
+     * контейнер сервлетов, а не прикладной код.
+     */
+    @Override
+    public ResponseEntity<ManagedMenuItem> uploadMenuItemImage(
+            Long restaurantId,
+            Long itemId,
+            org.springframework.web.multipart.MultipartFile file
+    ) {
+        if (file.isEmpty()) {
+            throw new com.dima.fooddelivery.common.exception.BusinessRuleViolationException(
+                    "Файл не передан или пуст"
+            );
+        }
+
+        if (file.getSize() > mediaProperties.maxSize().toBytes()) {
+            throw new ImageStorage.ImageTooLargeException(
+                    "Файл больше допустимого: не более " + mediaProperties.maxSize().toMegabytes() + " МБ"
+            );
+        }
+
+        byte[] content;
+
+        try {
+            content = file.getBytes();
+        } catch (java.io.IOException exception) {
+            throw new ImageStorage.MediaUnavailableException("Не удалось прочитать загруженный файл", exception);
+        }
+
+        return ResponseEntity.ok(MenuResponseMapper.toManagedResponse(
+                menuService.setItemImage(restaurantId, itemId, content)
+        ));
+    }
+
+    @Override
+    public ResponseEntity<Void> deleteMenuItemImage(Long restaurantId, Long itemId) {
+        menuService.removeItemImage(restaurantId, itemId);
+
+        return ResponseEntity.noContent().build();
     }
 
     @Override

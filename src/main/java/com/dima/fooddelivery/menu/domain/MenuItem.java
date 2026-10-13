@@ -83,6 +83,14 @@ public class MenuItem {
     @Column(name = "is_available", nullable = false)
     private boolean available;
 
+    /**
+     * Ключ фото в хранилище или {@code null}. Хранится ключ, а не адрес: адрес зависит от того,
+     * откуда фото отдаётся (шлюз, CDN), и меняется без перезаписи данных — см. {@link MenuImages}.
+     */
+    @Setter
+    @Column(name = "image_key", length = 200)
+    private String imageKey;
+
     // Сеттера нет: архивирование необратимо, и обратный путь не должен даже существовать
     // в API класса. Единственный способ изменить признак — метод archive().
     @Column(name = "is_archived", nullable = false)
