@@ -42,3 +42,15 @@ JPEG, PNG, WebP до 2 МБ; тип определяется по содержи
 
 Включение: `MEDIA_ENABLED=true`, `MEDIA_ENDPOINT`, `MEDIA_ACCESS_KEY`, `MEDIA_SECRET_KEY`, `MEDIA_BUCKET`,
 `MEDIA_MAX_SIZE`. По умолчанию выключено: загрузка отвечает 503, остальное меню работает.
+
+## Партнёрский SOAP API (меню для касс)
+
+Для касс и учётных систем ресторанов, которым REST неудобен. Контракт — XSD в `soap-contracts`
+(`urn:fooddelivery:partner:v1`), WSDL строится по нему: `GET /ws/menu.wsdl` (без токена). Запросы —
+`POST /ws/menu` с обычным заголовком `Authorization: Bearer <JWT>`; права те же, что у REST
+(управляющий рестораном или администратор).
+
+Операции: `GetMenu` (меню без архивного, с ценой, наличием и фото) и `SetItemAvailability`
+(блюдо закончилось или вернулось). Бизнес-правила общие с REST — их выполняет `MenuService`.
+Ошибки — SOAP Fault с деталью `PartnerFault`: `code` (`FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, …),
+`message` и `correlationId`; ошибки клиента — `Client`, наши сбои — `Server`.
